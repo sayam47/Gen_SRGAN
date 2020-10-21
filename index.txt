@@ -1,0 +1,5 @@
+xin_esrgan 		- 	VGG(L1) * 1 + VGAN * 0.005 + L1 * 0.01 
+M4_esrgan 		- 	VGG(L2) * 1 + VGAN * 0.001 + HV(PSNR()/30) * 0.0005
+paper_esrgan 	- 	VGG(L1) * 1 + RAGAN * 0.005 + L1 * 0.01
+M4_L1_xin		-	VGG(L1) * 1 + VGAN * 0.005 + L1 * 0.01 + HV(PSNR()/30) * 0.0005
+M4_L1_paper		-	VGG(L1) * 1 + RAGAN * 0.005 + L1 * 0.01 + HV(PSNR()/30) * 0.0005

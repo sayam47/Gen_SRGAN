@@ -1,0 +1,2 @@
+# VGG(L1) * 1 + RAGAN * 0.005 + L1 * 0.01
+python3 train.py --train_data_path /home/sayam/Desktop/SR_Dataset_1/DIV2K/DIV2K_train_HR --test_data_path /home/sayam/Desktop/SR_Dataset_1/benchmark/Set5/HR --epochs 10 --plot_every 1 --print_every 1 --output_path /home/sayam/Desktop/run_result --batch_size 4 --debug 1 --output_size 256x256 --warmup_batches 0 --method M1 --gan RAGAN --vgg_criterion L1 --weight_gan 0.005 --weight_vgg 1 --include_l1 1 --weight_l1 0.01
