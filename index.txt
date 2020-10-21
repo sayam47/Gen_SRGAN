@@ -1,5 +1,38 @@
-xin_esrgan 		- 	VGG(L1) * 1 + VGAN * 0.005 + L1 * 0.01 
-M4_esrgan 		- 	VGG(L2) * 1 + VGAN * 0.001 + HV(PSNR()/30) * 0.0005
-paper_esrgan 	- 	VGG(L1) * 1 + RAGAN * 0.005 + L1 * 0.01
-M4_L1_xin		-	VGG(L1) * 1 + VGAN * 0.005 + L1 * 0.01 + HV(PSNR()/30) * 0.0005
-M4_L1_paper		-	VGG(L1) * 1 + RAGAN * 0.005 + L1 * 0.01 + HV(PSNR()/30) * 0.0005
+xin_esrgan	 		- 	VGG(L1) * 1 + VGAN * 0.005 + L1 * 0.01 
+paper_esrgan	 	- 	VGG(L1) * 1 + RAGAN * 0.005 + L1 * 0.01
+
+# ran 35.5 for now
+M4_esrgan 			- 	VGG(L2) * 1 + VGAN * 0.001 + HV(PSNR()/30) * 0.0005
+M4_esrgan_paper		- 	VGG(L2) * 1 + RAGAN * 0.005 + HV(PSNR()/30) * 0.0005
+M4_L1_xin			-	VGG(L1) * 1 + VGAN * 0.005 + L1 * 0.01 + HV(PSNR()/30) * 0.0005
+M4_L1_paper			-	VGG(L1) * 1 + RAGAN * 0.005 + L1 * 0.01 + HV(PSNR()/30) * 0.0005
+
+M4_esrgan_35 		- 	VGG(L2) * 1 + VGAN * 0.001 + HV(PSNR()/35) * 0.0005
+M4_esrgan_paper_35	- 	VGG(L2) * 1 + RAGAN * 0.005 + HV(PSNR()/35) * 0.0005
+M4_L1_xin_35		-	VGG(L1) * 1 + VGAN * 0.005 + L1 * 0.01 + HV(PSNR()/35) * 0.0005
+M4_L1_paper_35		-	VGG(L1) * 1 + RAGAN * 0.005 + L1 * 0.01 + HV(PSNR()/35) * 0.0005
+
+M4_esrgan_40 		- 	VGG(L2) * 1 + VGAN * 0.001 + HV(PSNR()/40) * 0.0005
+M4_esrgan_paper_40	- 	VGG(L2) * 1 + RAGAN * 0.005 + HV(PSNR()/40) * 0.0005
+M4_L1_xin_40		-	VGG(L1) * 1 + VGAN * 0.005 + L1 * 0.01 + HV(PSNR()/40) * 0.0005
+M4_L1_paper_40		-	VGG(L1) * 1 + RAGAN * 0.005 + L1 * 0.01 + HV(PSNR()/40) * 0.0005
+
+# for all max psnr, gan type and L1 and L2 VGG loss.
+M5					-	VGG(L2) * 1 + RAGAN * 0.001 + (1 - (PSNR()/40) + 1 - SSIM) * 0.05
+
+# include all above possibilities with lpips
+# adding it linearly as well as with hv
+
+# try finding a good scale for psnr/mse and max value for ssim of vgg features/lpips features
+
+
+
+
+On paramshivay :
+
+Folder Name 					Method 															Train									Test
+output_xin_esrgan				VGG(L1) * 1 + VGAN * 0.005 + L1 * 0.01							29/0.72									29.0/0.82
+output_M4_esrgan				VGG(L2) * 1 + VGAN * 0.001 + HV(PSNR()/35) * 0.0005				28.5/0.75								28.9/0.83
+output_M4_esrgan_999			VGG(L2) * 1 + RAGAN * 0.001 + HV(PSNR/35.5) * 0.0005			29.3/0.75								29.0/0.83
+output_M4_vgg_l1				VGG(L1) * 1 + RAGAN * 0.001 + HV(PSNR/35.5) * 0.0005			29.2/0.73								29.0/0.82
+output_M5_esrgan_999			VGG(L2) * 1 + RAGAN * 0.001 + (PSNR/35.5 + SSIM) * 0.05			29.5/0.75								29.2/0.83
