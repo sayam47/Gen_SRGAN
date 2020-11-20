@@ -29,6 +29,8 @@ from pytorch_msssim import ssim, ms_ssim, SSIM, MS_SSIM
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")	
 Tensor = torch.cuda.FloatTensor if torch.cuda.is_available() else torch.Tensor
 
+ssim_fn_vgg = SSIM(data_range = 1.0, size_average= False, channel = 512)
+
 def write_to_csv_file(filename , content):
 	with open(filename , 'a+') as f:
 		file_writer = csv.writer(f)
@@ -85,6 +87,13 @@ def plot_image(epoch , generator , dataloader , dim=(1, 3), figsize=(15, 5)):
 			save_image(concat_image , file_name)
 
 
+def normalize_VGG_features(input_tensor):
+	assert(input_tensor.ndim == 4)
+	maxi = input_tensor.max(2)[0].max(2)[0].unsqueeze(2).unsqueeze(3).detach()
+	mini = input_tensor.min(2)[0].max(2)[0].unsqueeze(2).unsqueeze(3).detach()
+	return (input_tensor-mini)/(maxi - mini)
+
+
 def train():
 	print("GPU : " , torch.cuda.is_available())	
 	
@@ -131,8 +140,12 @@ def train():
 	generator.train()
 
 	loss_len = 6
-	if args.method == 'M4':
+	if args.method == 'M4' or args.method == 'M7':
 		loss_len = 7
+	elif args.method == 'M6':
+		loss_len = 9
+
+	losses_log = np.zeros(loss_len+1)
 
 	for epoch in range(start_epoch , start_epoch + args.epochs):
 		# print("*"*15 , "Epoch :" , epoch , "*"*15)
@@ -206,12 +219,35 @@ def train():
 			psnr_val = psnr_fn(gen_hr , imgs_hr.detach())
 			ssim_val = ssim_fn(gen_hr , imgs_hr.detach())
 
+
 			# Total generator loss
 			if args.method == 'M4':
 				loss_hv_psnr = hv_loss(1 - (psnr_val/args.max_psnr) , 1 - ssim_val)
 				loss_G = (loss_content * args.weight_vgg) + (loss_hv_psnr * args.weight_hv) + (args.weight_gan * loss_GAN)
 			elif args.method == 'M1':
 				loss_G = (loss_content * args.weight_vgg) + (args.weight_gan * loss_GAN)
+			elif args.method == 'M5':
+				psnr_loss = (1 - (psnr_val/args.max_psnr)).mean()
+				ssim_loss = (1 - ssim_val).mean()
+				loss_G = (loss_content * args.weight_vgg) + (args.weight_gan * loss_GAN) + (args.weight_pslinear * (ssim_loss + psnr_loss))
+			elif args.method == 'M6':
+				real_features_normalized = normalize_VGG_features(real_features)
+				gen_features_normalized = normalize_VGG_features(gen_features)
+				psnr_vgg_val = psnr_fn(gen_features_normalized , real_features_normalized)
+				ssim_vgg_val = ssim_fn_vgg(gen_features_normalized , real_features_normalized)
+				loss_vgg_hv = hv_loss(1 - (psnr_vgg_val/args.max_psnr) , 1 - ssim_vgg_val)
+				loss_G = (args.weight_vgg_hv * loss_vgg_hv) + (args.weight_gan * loss_GAN)
+			elif args.method == 'M7':
+				loss_hv_psnr = hv_loss(1 - (psnr_val/args.max_psnr) , 1 - ssim_val)
+				if (epoch - start_epoch) < args.loss_mem:
+					loss_G = (loss_content * args.weight_vgg) + (loss_hv_psnr * args.weight_hv) + (args.weight_gan * loss_GAN)
+				else:
+					weight_vgg = (1/losses_log[-args.loss_mem: , 1].mean()) * args.mem_vgg_weight
+					weight_bce = (1/losses_log[-args.loss_mem: , 2].mean()) * args.mem_bce_weight
+					weight_hv = (1/losses_log[-args.loss_mem: , 3].mean()) * args.mem_hv_weight
+					loss_G = (loss_content * weight_vgg) + (loss_hv_psnr * weight_hv) + (loss_GAN * weight_bce)				
+			elif args.method == "M2":
+	            loss_G = hv_loss(loss_GAN*args.weight_gan,loss_content*args.weight_vgg)			
 
 			if args.include_l1:
 				loss_G += (args.weight_l1 * l1_loss(gen_hr , imgs_hr))
@@ -246,10 +282,15 @@ def train():
 			# Total loss
 			loss_D = (loss_real + loss_fake) / 2
 
+			if args.method == 'M7':
+				if (epoch - start_epoch) >= args.loss_mem:
+					weight_dis = (1/losses_log[-args.loss_mem: , 5].mean()) * args.mem_bce_weight
+					loss_D = loss_D/weight_dis					
+
 			loss_D.backward()
 			optimizer_D.step()
 
-			if args.method == "M4":
+			if args.method == "M4" or args.method == "M7":
 				losses_gen += np.array([loss_content.item(), 
 										loss_GAN.item(), 
 										loss_hv_psnr.item(), 
@@ -258,7 +299,18 @@ def train():
 										psnr_val.mean().item(),
 										ssim_val.mean().item(),
 										])
-			elif args.method == 'M1':
+			elif args.method == "M6":
+				losses_gen += np.array([loss_content.item(), 
+										loss_GAN.item(),
+										psnr_vgg_val.mean().item(),
+										ssim_vgg_val.mean().item(),
+										loss_vgg_hv.item(), 
+										loss_G.item() , 
+										loss_D.item(),
+										psnr_val.mean().item(),
+										ssim_val.mean().item(),
+										])
+			else:
 				losses_gen += np.array([loss_content.item(), 
 										loss_GAN.item(), 
 										loss_G.item() , 
@@ -272,6 +324,11 @@ def train():
 		losses_gen.insert(0 , epoch)
 
 		write_to_csv_file(os.path.join(args.output_path ,'train_log.csv' ), losses_gen)
+
+		if (losses_log == np.zeros(loss_len+1)).sum() == loss_len+1:
+			losses_log = np.expand_dims(np.array(losses_gen) , 0)
+		else:
+			losses_log = np.vstack((losses_log , losses_gen))
 
 		if epoch%args.print_every == 0:
 			print('Epoch' , epoch , 'Loss GAN :' , losses_gen)
@@ -296,3 +353,4 @@ def train():
 
 if __name__ == '__main__':
 	train()
+
