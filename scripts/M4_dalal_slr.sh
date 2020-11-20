@@ -5,6 +5,7 @@
 #SBATCH --error=M4_dalal_slr.err
 #SBATCH --output=M4_dalal_slr.out
 #SBATCH --partition=gpu
+#SBATCH --gres=gpu:2
 
 
 module load cuda/10.1

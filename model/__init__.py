@@ -11,7 +11,7 @@ def get_generator(args):
 			scheduler_G = MultiStepLR(optimizer_G, milestones=args.multistep_milestones, gamma=args.multistep_gamma)
 		else:
 			lr_lambda = lambda epoch: 1 
-			scheduler_G = MultiplicativeLR(optimizer, lr_lambda)
+			scheduler_G = MultiplicativeLR(optimizer_G, lr_lambda)
 		return generator, optimizer_G, scheduler_G
 	raise NotImplementedError(str(args.model) +" is not implemented")
 
