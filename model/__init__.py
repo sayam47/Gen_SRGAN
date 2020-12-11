@@ -2,6 +2,7 @@ import torch
 from torch.optim.lr_scheduler import MultiplicativeLR,MultiStepLR
 from model.VGGStyleDiscriminator128 import VGGStyleDiscriminator128
 from model.RRDBNet import RRDBNet
+from model.discriminator2 import Discriminator
 
 def get_generator(args):
 	if args.model == 'rrdb':
@@ -21,3 +22,9 @@ def get_discriminator(args):
 		optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=args.lr , betas=args.betas)
 		return discriminator, optimizer_D
 	raise NotImplementedError(str(args.model) +" is not implemented")
+
+def get_discrminator2(args):
+	discriminator = Discriminator()
+	optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=args.lr , betas=args.betas)
+	return discriminator, optimizer_D
+
