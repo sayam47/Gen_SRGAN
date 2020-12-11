@@ -103,6 +103,10 @@ def train():
 	discriminator,optimizer_D = model.get_discriminator(args)
 	discriminator.to(device)
 
+	if args.method == 'M3':
+		discriminator2, optimizer_D2 = model.get_discrminator2(args)
+		discriminator2.to(device)
+
 	start_epoch = 0
 
 	if args.resume_training:
@@ -165,6 +169,10 @@ def train():
 			# discriminator.eval()
 			for p in discriminator.parameters():
 				p.requires_grad = False
+
+			if args.method == 'M3':
+				for p in discriminator2.parameters():
+					p.requires_grad = False
 			
 			optimizer_G.zero_grad()
 			
@@ -203,6 +211,21 @@ def train():
 				# Adversarial loss (vanilla GAN)
 				loss_GAN = bce_loss(pred_fake, valid)
 
+			if args.method == 'M3':
+				# Extract validity predictions from discriminator
+				pred_real2 = discriminator2(imgs_hr).detach()
+				pred_fake2 = discriminator2(gen_hr)
+	
+				valid2 = torch.ones_like(pred_real2)
+				fake2 = torch.zeros_like(pred_real2)
+				if args.gan == 'RAGAN':
+        	                        # Adversarial loss (relativistic average GAN)        
+					loss_GAN2 = bce_loss(pred_fake2 - pred_real2.mean(0, keepdim=True), valid2)
+				elif args.gan == "VGAN":
+                        	        # Adversarial loss (vanilla GAN)
+					loss_GAN2 = bce_loss(pred_fake2, valid2)
+
+				
 			# Content loss
 			gen_features = feature_extractor(gen_hr)
 			real_features = feature_extractor(imgs_hr).detach()
@@ -247,7 +270,10 @@ def train():
 					weight_hv = (1/losses_log[-args.loss_mem: , 3].mean()) * args.mem_hv_weight
 					loss_G = (loss_content * weight_vgg) + (loss_hv_psnr * weight_hv) + (loss_GAN * weight_bce)				
 			elif args.method == "M2":
-	            loss_G = hv_loss(loss_GAN*args.weight_gan,loss_content*args.weight_vgg)			
+				loss_G = hv_loss(loss_GAN*args.weight_gan,loss_content*args.weight_vgg)		
+			elif args.method == 'M3':
+				loss_G = (args.weight_vgg * loss_content) + (args.weight_hv * hv_loss(loss_GAN * args.weight_gan , loss_GAN2 * args.weight_gan ))			
+
 
 			if args.include_l1:
 				loss_G += (args.weight_l1 * l1_loss(gen_hr , imgs_hr))
@@ -265,6 +291,29 @@ def train():
 			for p in discriminator.parameters():
 				p.requires_grad = True
 
+			if args.method == 'M3':
+				for p in discriminator2.parameters():
+                                	p.requires_grad = True
+
+			if args.method == 'M3':
+				pred_real2 = discriminator2(imgs_hr)
+				pred_fake2 = discriminator2(gen_hr.detach())
+				valid2 = torch.ones_like(pred_real2)
+				fake2 = torch.zeros_like(pred_real2)
+				if args.gan == "RAGAN":
+        	                        # Adversarial loss for real and fake images (relativistic average GAN)
+					loss_real2 = bce_loss(pred_real2 - pred_fake2.mean(0, keepdim=True), valid2)        
+					loss_fake2 = bce_loss(pred_fake2 - pred_real2.mean(0, keepdim=True), fake2)
+				elif args.gan == "VGAN":
+        	                        # Adversarial loss for real and fake images (vanilla GAN)
+					loss_real2 = bce_loss(pred_real2, valid2)
+					loss_fake2 = bce_loss(pred_fake2, fake2)
+				
+				optimizer_D2.zero_grad()
+				loss_D2 = (loss_real2 + loss_fake2) / 2
+				loss_D2.backward()
+				optimizer_D2.step()
+				
 			optimizer_D.zero_grad()
 
 			pred_real = discriminator(imgs_hr)
